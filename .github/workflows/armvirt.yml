@@ -1,0 +1,73 @@
+name: compiler-armvirt
+
+on:
+  workflow_dispatch:
+
+env:
+  REPO_URL: https://git.openwrt.org/openwrt/openwrt.git
+  REPO_BRANCH: v21.02.6
+  CONFIG_FILE: config-openwrt/v21.02.6/armvirt64.config
+  PATCH_FILE: patch/21.02.6/netsupport.mk
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    if: ${{ github.event.repository.owner.id }} == ${{ github.event.sender.id }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Clone source code
+        run: |
+          git clone ${REPO_URL} -b ${REPO_BRANCH}
+      
+      - name: Load custom configuration
+        run: |
+          echo -n 'd4a7d36962bb6218ebd94bf040ac560e' > openwrt/vermagic
+          sed -i '/mkhash md5/s/^/#/; /mkhash md5/a \	cp $(TOPDIR)/vermagic $(LINUX_DIR)/.vermagic' openwrt/include/kernel-defaults.mk
+          sed -i '/STAMP_BUILT/s/^/#/; /STAMP_BUILT/a \  STAMP_BUILT:=$(STAMP_BUILT)_$(shell cat $(LINUX_DIR)/.vermagic)' openwrt/package/kernel/linux/Makefile
+          
+          cp -f ${CONFIG_FILE} openwrt/.config
+          cp -f ${PATCH_FILE} openwrt/package/kernel/linux/modules/
+          
+      - name: Update feeds
+        run: cd openwrt/ && ./scripts/feeds update -a
+      
+      - name: Install feeds
+        run: cd openwrt/ && ./scripts/feeds install -a
+        
+      - name: Download package
+        run: |
+          cd openwrt/
+          make defconfig
+          make download -j$(nproc)
+          
+      - name: Compile the tools
+        run: |
+          cd openwrt/
+          make tools/compile -j$(nproc) V=w
+       
+      - name: Compile the toolchain
+        run: |
+          cd openwrt/
+          make toolchain/compile -j$(nproc) V=w
+      
+      - name: Compile the kernel
+        run: |
+          cd openwrt/
+          make target/linux/compile -j$(nproc) V=w
+      
+      - name: Compile package
+        run: |
+          cd openwrt/
+          make package/kernel/linux/compile -j$(nproc) V=w
+          
+      - name: Upload Package to Releases
+        uses: ncipollo/release-action@main
+        if: ${{ env.PACKAGED_STATUS }} == 'success' && !cancelled()
+        with:
+          tag: 21.02.6-armvirt
+          artifacts: "openwrt/bin/targets/armvirt/64/packages/*"
+          allowUpdates: true
+          token: ${{ secrets.GITHUB_TOKEN }}
