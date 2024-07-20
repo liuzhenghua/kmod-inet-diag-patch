@@ -67,7 +67,7 @@ jobs:
         uses: ncipollo/release-action@main
         if: ${{ env.PACKAGED_STATUS }} == 'success' && !cancelled()
         with:
-          tag: 21.02.5-armvirt
-          artifacts: "openwrt/bin/targets/armvirt/64/packages/*"
+          tag: 21.02.5-mediatek-mt7629
+          artifacts: "openwrt/bin/targets/mediatek/mt7629/packages/*"
           allowUpdates: true
           token: ${{ secrets.GITHUB_TOKEN }}
