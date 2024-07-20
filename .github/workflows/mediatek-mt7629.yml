@@ -1,4 +1,4 @@
-name: compiler-armvirt
+name: compiler-mediatek-mt7629
 
 on:
   workflow_dispatch:
